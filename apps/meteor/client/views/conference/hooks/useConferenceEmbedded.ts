@@ -13,7 +13,7 @@ import {
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { CallPreferences } from './useCallDevicesInitialState';
+import type { CallPreferences } from './useCallPreferences';
 import { departureFor } from './useLeaveConferenceOnClose';
 import { conferenceNameFor } from '../../../../lib/videoConference/conferenceName';
 import type { PersistentChatMode } from '../../../../lib/videoConference/constants';
