@@ -20,6 +20,7 @@ import {
 	isGroupsHistoryProps,
 	isGroupsInfoProps,
 	isGroupsInviteProps,
+	isGroupsListAllProps,
 	isGroupsListProps,
 	isGroupsModeratorsProps,
 	isGroupsOnlineProps,
@@ -1002,7 +1003,7 @@ API.v1.get(
 	'groups.listAll',
 	{
 		authRequired: true,
-		query: isGroupsListProps,
+		query: isGroupsListAllProps,
 		permissionsRequired: ['view-room-administration'],
 		response: {
 			200: groupsListResponseSchema,
@@ -1015,6 +1016,10 @@ API.v1.get(
 		const { offset, count } = await getPaginationItems(this.queryParams);
 		const { sort, fields, query } = await this.parseJsonQuery();
 		const ourQuery = Object.assign({}, query, { t: 'p' as RoomType });
+
+		if ('roomId' in this.queryParams && this.queryParams.roomId) {
+			ourQuery._id = this.queryParams.roomId;
+		}
 
 		const { cursor, totalCount } = await Rooms.findPaginated(ourQuery, {
 			sort: sort || { name: 1 },

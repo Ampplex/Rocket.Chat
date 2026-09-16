@@ -1754,6 +1754,102 @@ describe('[Groups]', () => {
 			return updatePermission('view-room-administration', ['admin']);
 		});
 
+		describe('filtering by roomId', () => {
+			let owner: TestUser<IUser>;
+			let ownerCredentials: Credentials;
+			let group: IRoom;
+			let channel: IRoom;
+
+			before(async () => {
+				await updatePermission('view-room-administration', ['admin']);
+
+				owner = await createUser();
+				ownerCredentials = await login(owner.username, password);
+
+				group = (await createRoom({ type: 'p', name: `groups.listAll.roomId.${Date.now()}`, credentials: ownerCredentials })).body.group;
+				channel = (await createRoom({ type: 'c', name: `groups.listAll.roomId.c.${Date.now()}` })).body.channel;
+
+				await request
+					.post(api('rooms.saveRoomSettings'))
+					.set(ownerCredentials)
+					.send({ rid: group._id, roomCustomFields: { ssn: 'abc' } })
+					.expect(200);
+			});
+
+			after(async () => {
+				await Promise.all([deleteRoom({ type: 'p', roomId: group._id }), deleteRoom({ type: 'c', roomId: channel._id })]);
+				await deleteUser(owner);
+			});
+
+			it('should return the full document of that group to an admin who is not a member', async () => {
+				const response = await request
+					.get(api('groups.listAll'))
+					.set(credentials)
+					.query({ roomId: group._id })
+					.expect('Content-Type', 'application/json')
+					.expect(200);
+
+				expect(response.body).to.have.property('success', true);
+				expect(response.body).to.have.property('total', 1);
+				expect(response.body.groups).to.be.an('array').with.lengthOf(1);
+				expect(response.body.groups[0]).to.have.property('_id', group._id);
+				expect(response.body.groups[0]).to.have.nested.property('u.username', owner.username);
+				expect(response.body.groups[0]).to.have.deep.property('customFields', { ssn: 'abc' });
+				expect(response.body.groups[0]).to.include.all.keys('_updatedAt', 'ts');
+			});
+
+			it('should return nothing for the id of a public channel', async () => {
+				const response = await request
+					.get(api('groups.listAll'))
+					.set(credentials)
+					.query({ roomId: channel._id })
+					.expect('Content-Type', 'application/json')
+					.expect(200);
+
+				expect(response.body).to.have.property('total', 0);
+				expect(response.body.groups).to.be.an('array').that.is.empty;
+			});
+
+			it('should return nothing for an unknown id', async () => {
+				const response = await request
+					.get(api('groups.listAll'))
+					.set(credentials)
+					.query({ roomId: 'unknown-room-id' })
+					.expect('Content-Type', 'application/json')
+					.expect(200);
+
+				expect(response.body).to.have.property('total', 0);
+				expect(response.body.groups).to.be.an('array').that.is.empty;
+			});
+
+			it('should reject an empty roomId instead of ignoring it', async () => {
+				await request
+					.get(api('groups.listAll'))
+					.set(credentials)
+					.query({ roomId: '' })
+					.expect('Content-Type', 'application/json')
+					.expect(400);
+			});
+
+			it('should reject a roomId that is not a plain string', async () => {
+				await request
+					.get(api('groups.listAll'))
+					.set(credentials)
+					.query('roomId[$ne]=x')
+					.expect('Content-Type', 'application/json')
+					.expect(400);
+			});
+
+			it('should not let a user without view-room-administration read the group', async () => {
+				await request
+					.get(api('groups.listAll'))
+					.set(ownerCredentials)
+					.query({ roomId: group._id })
+					.expect('Content-Type', 'application/json')
+					.expect(403);
+			});
+		});
+
 		it('should succeed if user has view-room-administration permission', async () => {
 			await request
 				.get(api('groups.listAll'))
